@@ -1,0 +1,1568 @@
+<!doctype html>
+<html lang="it" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAC Simulator PRO — Monte Carlo</title>
+  <meta name="description" content="Simulatore PAC con Monte Carlo: fan chart, probabilità obiettivo, export e link condivisibile." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath fill='%23111827' d='M10 10h80v80H10z'/%3E%3Cpath fill='%23fff' d='M28 70V30h10v40H28zm17 0V40h10v30H45zm17 0V50h10v20H62z'/%3E%3C/svg%3E">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#0f172a; --muted:#94a3b8; --text:#e5e7eb;
+      --line:#1f2a44; --accent:#60a5fa; --accent2:#34d399; --danger:#fb7185; --warn:#fbbf24;
+      --shadow: 0 20px 50px rgba(0,0,0,.35);
+      --radius: 18px;
+      --purple:#a78bfa;
+      --gray:#9ca3af;
+      --tipbg:#020617; /* tooltip SOLIDO */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(96,165,250,.25), transparent 60%),
+                  radial-gradient(900px 500px at 80% 0%, rgba(52,211,153,.18), transparent 55%),
+                  radial-gradient(900px 700px at 60% 110%, rgba(251,113,133,.10), transparent 55%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+    }
+    a{color:inherit}
+    .wrap{max-width:1320px;margin:0 auto;padding:24px 12px 44px}
+    .top{
+      display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{
+      width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg, rgba(96,165,250,.95), rgba(52,211,153,.85));
+      display:grid;place-items:center;box-shadow: var(--shadow);
+    }
+    .logo svg{filter: drop-shadow(0 10px 18px rgba(0,0,0,.35))}
+    .title{line-height:1.15}
+    .title h1{font-size:18px;margin:0 0 2px;font-weight:800;letter-spacing:.2px}
+    .title p{margin:0;color:var(--muted);font-size:13px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    button{
+      appearance:none;border:1px solid rgba(255,255,255,.08);background:rgba(15,23,42,.75);
+      color:var(--text);padding:10px 12px;border-radius:14px;cursor:pointer;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      font-weight:650;font-size:13px;
+    }
+    button:hover{border-color:rgba(96,165,250,.35)}
+    button.primary{
+      background: linear-gradient(135deg, rgba(96,165,250,.95), rgba(52,211,153,.85));
+      border-color: transparent; color:#06101f;
+    }
+    button.primary:hover{filter:brightness(1.05)}
+    button.ghost{background:rgba(15,23,42,.45)}
+
+    .grid{display:grid;grid-template-columns: 380px 1fr; gap:16px; align-items:start}
+    @media (max-width: 980px){.grid{grid-template-columns:1fr}}
+
+    /* ⚠️ IMPORTANTISSIMO: evitare clipping dei tooltip */
+    .card{
+      background: linear-gradient(180deg, rgba(15,23,42,.92), rgba(15,23,42,.72));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: visible; /* <- niente taglio tooltip */
+      position:relative;
+    }
+    /* per mantenere “look” interno senza tagliare tooltip */
+    .cardInner{
+      border-radius: var(--radius);
+      overflow:hidden;
+    }
+
+    .card .hd{
+      padding:14px 14px 12px;border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex;justify-content:space-between;align-items:center;gap:10px
+    }
+    .hd h2{
+      margin:0;font-size:13px;letter-spacing:.25px;text-transform:uppercase;color:#cbd5e1;
+      display:flex;align-items:center;gap:8px
+    }
+    .hd small{color:var(--muted)}
+    .card .bd{padding:14px}
+
+    .row{display:grid;grid-template-columns: 1fr 1fr; gap:10px}
+    .row-1{display:grid;grid-template-columns: 1fr; gap:10px}
+
+    label{display:flex;align-items:center;gap:8px;color:#cbd5e1;font-size:12px;margin:0 0 6px}
+    input, select{
+      width:100%;padding:11px 12px;border-radius:14px;
+      background:rgba(2,6,23,.55);
+      color:var(--text);border:1px solid rgba(255,255,255,.08);
+      outline:none;font-weight:650;
+    }
+    input:focus, select:focus{border-color:rgba(96,165,250,.55); box-shadow: 0 0 0 3px rgba(96,165,250,.12)}
+    .hint{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.35}
+
+    .kpis{display:grid;grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px}
+    @media (max-width: 980px){.kpis{grid-template-columns: repeat(2, minmax(0,1fr));}}
+    .kpi{
+      padding:12px;border-radius:16px;border:1px solid rgba(255,255,255,.08);
+      background: rgba(2,6,23,.35);
+    }
+    .kpi .lab{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.25px}
+    .kpi .val{margin-top:6px;font-size:18px;font-weight:900}
+    .kpi .sub{margin-top:2px;color:var(--muted);font-size:12px}
+
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);background: rgba(2,6,23,.35);color:#cbd5e1;font-size:12px
+    }
+    .prog{
+      height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:10px;
+    }
+    .prog > div{height:100%;width:0%;background: linear-gradient(90deg, rgba(96,165,250,.95), rgba(52,211,153,.85));transition:width .2s}
+
+    .charts{display:grid;grid-template-columns: 1fr; gap:16px}
+    .chartBox{height:390px} /* un po' più alto */
+    .chartBox.small{height:260px}
+    canvas{width:100% !important;height:100% !important}
+
+/* ====== tooltip infopoint (PORTAL) ====== */
+/* ====== tooltip infopoint (PORTAL) ====== */
+.info{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(2,6,23,.35);
+  color:#cbd5e1;
+  font-size:12px; line-height:1;
+  cursor:help;
+  position:relative;
+  flex:0 0 auto;
+  z-index:0; /* <- evita che le "i" stiano sopra al tooltip */
+}
+.info::before{content:"i"; font-weight:900; transform:translateY(-.5px);}
+
+/* NON mostrare più i tooltip inline (quelli dentro la card) */
+.tip{ display:none !important; }
+
+/* Tooltip globale attaccato al BODY: non viene mai tagliato da overflow */
+.globalTip{
+  position:fixed;
+  left:0; top:0;
+  width:320px;
+  max-width:min(360px, calc(100vw - 24px));
+  background: #020617; /* SOLIDO */
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow: 0 22px 60px rgba(0,0,0,.65);
+  color:#e5e7eb;
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.35;
+  z-index:999999; /* sopra tutto */
+  opacity:0;
+  pointer-events:none;
+  transform: translateY(6px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.globalTip.show{
+  opacity:1;
+  transform: translateY(0);
+}
+.globalTip b{color:#e2e8f0}
+
+
+    /* ====== legenda stile screenshot ====== */
+    .legendRow{
+      display:flex; flex-wrap:wrap; gap:10px;
+      margin: 4px 0 12px;
+    }
+    .legendPill{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:9px 12px; /* un pelo più compatta */
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(2,6,23,.25);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+      color:#e5e7eb;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .legendDot{
+      width:12px;height:12px;border-radius:999px;
+      background: var(--c);
+      box-shadow: 0 0 0 4px rgba(255,255,255,.04);
+      flex:0 0 auto;
+    }
+    .legendPill .lab{
+      font-size:13px; /* ridotto così “obiettivo” non va a capo */
+      letter-spacing:.15px;
+    }
+
+    /* ====== toggle centrato ====== */
+    .centerBlock{
+      display:flex; justify-content:center;
+    }
+    .toggle{
+      display:inline-flex; align-items:center; gap:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(2,6,23,.25);
+      color:#cbd5e1;
+      font-size:12px;
+    }
+    .toggle input{width:auto; margin:0}
+
+    .noteUnderChart{
+      margin-top:10px;
+      color: rgba(148,163,184,.95);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .footer{
+      margin-top:14px;color:rgba(148,163,184,.9);font-size:12px;line-height:1.45
+    }
+    .footer b{color:#e2e8f0}
+    #cardDistribution{
+  max-width: 100%;
+  width: 100%;
+}
+#cardDistribution .chartBox{
+  max-width: 100%;
+}
+/* ===== CTA (solo titolo/testo/bottone) ===== */
+.ctaCard{
+  text-align:center;
+  padding: 28px 22px; /* margine interno dx/sx */
+  border-radius: calc(var(--radius) + 4px);
+  background:
+    radial-gradient(900px 240px at 50% 0%, rgba(96,165,250,.22), rgba(255,255,255,.04)),
+    linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  border: 1px solid rgba(96,165,250,.35);
+  box-shadow:
+    0 18px 46px rgba(0,0,0,.35),
+    0 0 0 1px rgba(255,255,255,.06) inset;
+}
+
+.ctaInner{
+  max-width: 90ch;
+  margin: 0 auto;
+  padding: 0 6px;
+}
+
+.ctaCard h3{
+  margin: 0 0 12px 0;
+  font-size: 34px; /* +4px */
+  letter-spacing: .15px;
+}
+
+.ctaCard p{
+  margin: 0 auto 18px auto;
+  line-height: 1.55;
+  font-size: 15px;
+  color: rgba(238,242,255,.88);
+}
+
+.ctaActions{
+  display:flex;
+  justify-content:center;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+/* ===== CTA MODAL ===== */
+.modalOverlay{
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 999999;
+}
+.modalOverlay.open{ display:flex; }
+
+.modalCard{
+  width: min(680px, 96vw);
+  background: rgba(15,23,42,.98);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+  box-shadow: 0 20px 70px rgba(0,0,0,.55);
+  overflow:hidden;
+}
+
+.modalHead{
+  padding: 14px 14px 10px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.modalTitle{ font-weight: 900; font-size: 16px; letter-spacing:.2px; }
+.modalSub{ color: var(--muted); font-size: 13px; margin-top: 4px; line-height:1.45; }
+
+.modalBody{ padding: 14px; }
+
+.modalGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 900px){
+  .modalGrid{ grid-template-columns: 1fr; }
+}
+
+.modalActions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top: 12px;
+}/* ===== CTA MODAL ===== */
+.modalOverlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 9999;
+}
+.modalOverlay.open{ display:flex; }
+
+.modalCard{
+  width: min(720px, 96vw);
+  background: rgba(20,22,28,.98);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.40);
+  padding: 16px;
+}
+
+.modalHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.modalTitle{ font-weight: 800; font-size: 18px; }
+.modalSub{ opacity: .8; font-size: 13px; margin-top: 4px; }
+
+.modalForm .lbl{ display:block; margin: 10px 0 6px; font-size: 12px; opacity:.9; }
+.modalForm .in{
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  outline: none;
+}
+.modalForm .in:focus{ border-color: rgba(255,255,255,.22); }
+
+.modalActions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top: 14px;
+}
+
+/* riuso stile bottoni già esistenti */
+.iconBtn{
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  cursor: pointer;
+}
+.iconBtn:hover{ background: rgba(255,255,255,.07); }
+
+.hidden{ display:none; }
+
+
+  </style>
+</head>
+<body>
+  <!-- ===== MODALE CTA (FORM) ===== -->
+<div class="modalOverlay" id="modalCta" aria-hidden="true">
+  <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalCtaTitle">
+    <div class="modalHead">
+      <div>
+        <div class="modalTitle" id="modalCtaTitle">Richiedi analisi gratuita</div>
+        <div class="modalSub">Compila i dati e ti ricontatto via email.</div>
+      </div>
+      <button class="iconBtn" type="button" id="btnCloseCta" aria-label="Chiudi">✕</button>
+    </div>
+
+    <form class="modalForm" method="POST" action="https://formspree.io/f/xojjangr" id="ctaModalForm">
+      <input type="text" name="_gotcha" class="hidden" tabindex="-1" autocomplete="off">
+
+      <label class="lbl">Nome e Cognome</label>
+      <input class="in" name="nome_cognome" required placeholder="Es. Mario Rossi" />
+
+      <label class="lbl">Email</label>
+      <input class="in" type="email" name="email" required placeholder="nome@email.it" />
+
+      <label class="lbl">Numero di telefono</label>
+      <input class="in" name="telefono" required placeholder="+39 ..." />
+
+      <!-- meta utili -->
+      <input type="hidden" name="tool" value="PAC Simulator PRO" />
+      <input type="hidden" name="page" value="Monte Carlo" />
+
+      <div class="modalActions">
+        <button type="button" class="ghost" id="btnCancelCta">Annulla</button>
+        <button type="submit" class="primary">Invia richiesta</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+  <div class="wrap">
+    <div class="top">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 19V5" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M8 19V10" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M12 19V7" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M16 19V13" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M20 19V9" stroke="#06101f" stroke-width="2.4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="title">
+          <h1>PAC Simulator PRO</h1>
+          <p>Emmanuel Sanna Consulente Finanziario</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="btnShare">Condividi link</button>
+        <button class="ghost" id="btnCSV">Export CSV</button>
+        <button class="primary" id="btnRun">Avvia simulazione</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- PARAMETRI -->
+      <div class="card" id="cardParams">
+        <div class="cardInner">
+          <div class="hd">
+            <h2>
+              Parametri
+              <span class="info" aria-label="Info Parametri">
+                <span class="tip"><b>Compila i campi</b> con i parametri di partenza per simulare l’evoluzione del tuo piano nel tempo.</span>
+              </span>
+            </h2>
+            <span class="pill" id="statusPill">Pronto</span>
+          </div>
+          <div class="bd">
+            <div class="row">
+              <div>
+                <label>
+                  Obiettivo (€)
+                  <span class="info"><span class="tip">Inserisci il <b>capitale target</b> che vuoi raggiungere.</span></span>
+                </label>
+                <input id="goal" type="number" min="0" step="1000" value="300000">
+              </div>
+              <div>
+                <label>
+                  Durata (anni)
+                  <span class="info"><span class="tip">Inserisci l’<b>orizzonte temporale</b> entro il quale vuoi raggiungere l’obiettivo.</span></span>
+                </label>
+                <input id="years" type="number" min="1" max="40" step="1" value="25">
+              </div>
+              <div>
+                <label>
+                  Capitale iniziale (€)
+                  <span class="info"><span class="tip">Inserisci il capitale che hai già a disposizione <b>oggi</b> per investire.</span></span>
+                </label>
+                <input id="initial" type="number" min="0" step="1000" value="5000">
+              </div>
+              <div>
+                <label>
+                  Versamento mensile (€)
+                  <span class="info"><span class="tip">Inserisci il capitale che investirai periodicamente. Se non investirai altro capitale, inserisci <b>0</b>.</span></span>
+                </label>
+                <input id="monthly" type="number" min="0" step="50" value="400">
+              </div>
+            </div>
+
+            <div style="height:10px"></div>
+
+            <div class="row">
+              <div>
+                <label>
+                  Profilo
+                  <span class="info">
+                    <span class="tip">
+                      Scegli il tuo profilo di rischio:<br>
+                      🔵 <b>Prudente</b> (atteso indicativo: 2–4%)<br>
+                      🟠 <b>Bilanciato</b> (atteso indicativo: 4–7%)<br>
+                      🔴 <b>Dinamico</b> (atteso indicativo: 6–9%)<br><br>
+                      <b>N.B.</b> Rendimenti stimati e <b>non garantiti</b>.
+                    </span>
+                  </span>
+                </label>
+                <select id="profile">
+                  <option value="prudente">Prudente</option>
+                  <option value="bilanciato" selected>Bilanciato</option>
+                  <option value="dinamico">Dinamico</option>
+                </select>
+              </div>
+              <div>
+                <label>
+                  Simulazioni
+                  <span class="info"><span class="tip">Numero di percorsi Monte Carlo generati. Più simulazioni = risultati più stabili, ma serve più tempo di calcolo.</span></span>
+                </label>
+                <input id="sims" type="number" min="500" max="50000" step="500" value="10000">
+              </div>
+            </div>
+
+            <div style="height:10px"></div>
+
+            <!-- ✅ layout richiesto: inflazione + TER / bollo + tasse -->
+            <div class="row">
+              <div>
+                <label>
+                  Inflazione annua
+                  <span class="info"><span class="tip">Inserisci una stima dell’inflazione annua. Suggerimento: lecito attendersi una media tra <b>0,02–0,03</b>.</span></span>
+                </label>
+                <input id="infl" type="number" min="0" max="0.20" step="0.001" value="0.02">
+              </div>
+              <div>
+                <label>
+                  TER annuo
+                  <span class="info"><span class="tip">Costo di gestione medio annuo del tuo portafoglio (es. TER ETF/fondi).</span></span>
+                </label>
+                <input id="ter" type="number" min="0" max="0.05" step="0.0005" value="0.002">
+              </div>
+              <div>
+                <label>
+                  Bollo annuo
+                  <span class="info"><span class="tip">Imposta di bollo sul dossier titoli (in Italia tipicamente <b>0,20%</b> annuo).</span></span>
+                </label>
+                <input id="bollo" type="number" min="0" max="0.05" step="0.0005" value="0.002">
+              </div>
+              <div>
+                <label>
+                  Tasse plusvalenze
+                  <span class="info"><span class="tip">Aliquota applicata alle plusvalenze (semplificazione). In Italia spesso <b>26%</b>.</span></span>
+                </label>
+                <input id="tax" type="number" min="0" max="0.60" step="0.01" value="0.26">
+              </div>
+            </div>
+
+            <div style="height:10px"></div>
+
+            <div class="centerBlock">
+              <div class="toggle">
+                <input id="adjInfl" type="checkbox" checked>
+                <span>Indicizza i versamenti all’inflazione</span>
+                <span class="info"><span class="tip">Se attivo, il versamento mensile cresce ogni anno in base all’inflazione stimata.</span></span>
+              </div>
+            </div>
+
+            <div style="height:10px"></div>
+
+            <div class="centerBlock">
+              <div style="width:min(320px,100%)">
+                <label style="justify-content:center">
+                  Seed (stabilità risultati)
+                  <span class="info"><span class="tip">Valore che controlla la casualità della simulazione. A parità di parametri, stesso seed = risultati ripetibili.</span></span>
+                </label>
+                <input id="seed" type="number" step="1" value="424242" style="text-align:center">
+              </div>
+            </div>
+
+            <div class="hint">
+              <b>Nota:</b> simulazione Monte Carlo con rendimenti sintetici (μ/σ per profilo). Non usa dati storici.
+              Serve per valutare <b>range di esiti</b> e <b>robustezza del piano</b>, non per previsioni.
+            </div>
+
+            <div class="prog" aria-label="Progresso simulazione">
+              <div id="progBar"></div>
+            </div>
+            <div class="hint" id="progText">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RISULTATI -->
+      <div class="charts">
+        <div class="card" id="cardResults">
+          <div class="cardInner">
+            <div class="hd">
+              <h2>
+                Risultati
+                <span class="info" aria-label="Info Risultati">
+                  <span class="tip">
+                    Questo grafico mostra un <b>intervallo di scenari</b> (p10–p90) dell’evoluzione del capitale nel tempo.
+                    <br><br>
+                    <b>Versato</b> = capitale immesso complessivamente (con indicizzazione se attiva).<br>
+                    <b>Obiettivo</b> = target da raggiungere.
+                  </span>
+                </span>
+              </h2>
+              <small id="kpiMeta">—</small>
+            </div>
+            <div class="bd">
+              <div class="kpis">
+                <div class="kpi">
+                  <div class="lab">Probabilità obiettivo</div>
+                  <div class="val" id="kpiProb">—</div>
+                  <div class="sub" id="kpiProbSub">—</div>
+                </div>
+                <div class="kpi">
+                  <div class="lab">Mediana finale (p50)</div>
+                  <div class="val" id="kpiP50">—</div>
+                  <div class="sub">Netto tasse (fine periodo)</div>
+                </div>
+                <div class="kpi">
+                  <div class="lab">Scenario prudente (p10)</div>
+                  <div class="val" id="kpiP10">—</div>
+                  <div class="sub">Netto tasse (fine periodo)</div>
+                </div>
+                <div class="kpi">
+                  <div class="lab">Scenario favorevole (p90)</div>
+                  <div class="val" id="kpiP90">—</div>
+                  <div class="sub">Netto tasse (fine periodo)</div>
+                </div>
+              </div>
+
+              <div style="height:14px"></div>
+
+              <div class="legendRow" id="fanLegend"></div>
+
+              <div class="row-1">
+                <div class="chartBox">
+                  <canvas id="fanChart"></canvas>
+                </div>
+              </div>
+
+              <div class="noteUnderChart">
+                <b>Come leggere il grafico:</b> p10 rappresenta uno scenario prudente (solo il 10% degli esiti è peggiore),
+                p50 è lo scenario mediano, p90 è uno scenario favorevole. Se le curve stanno sopra <b>Obiettivo</b>,
+                la probabilità di raggiungerlo è maggiore.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+        <!-- ===== NUOVE CARD TOOL ===== -->
+    <div style="height:16px"></div>
+
+    <!-- 1) Chance di raggiungere l’obiettivo nel tempo -->
+     <!-- DISTRIBUZIONE -->
+<div class="card" id="cardDistribution">
+  <div class="cardInner">
+    <div class="hd">
+      <h2>
+        Distribuzione finale
+        <span class="info" aria-label="Info Distribuzione finale">
+          <span class="tip">
+            Istogramma dei possibili capitali finali (netti tasse). Mostra quanto spesso i risultati
+            si concentrano in certe fasce di valore.
+          </span>
+        </span>
+      </h2>
+      <small>Netto tasse • istogramma</small>
+    </div>
+    <div class="bd">
+      <div class="chartBox small">
+        <canvas id="histChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height:16px"></div>
+
+<!-- 1) Chance di raggiungere l’obiettivo nel tempo -->
+    <div class="card" id="cardProbTime">
+      <div class="cardInner">
+        <div class="hd">
+          <h2>
+            Probabilità obiettivo nel tempo
+            <span class="info" aria-label="Info Probabilità nel tempo">
+              <span class="tip">
+                Mostra, per ogni anno, la percentuale di simulazioni che hanno raggiunto o superato l’obiettivo.
+                Utile per capire <b>quando</b> aumenta la probabilità di successo del piano.
+              </span>
+            </span>
+          </h2>
+          <small>Chance curve • per anno</small>
+        </div>
+        <div class="bd">
+          <div class="chartBox small">
+            <canvas id="probChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <!-- 2) Tempo atteso per raggiungere l’obiettivo -->
+    <div class="card" id="cardTTG">
+      <div class="cardInner">
+        <div class="hd">
+          <h2>
+            Tempo atteso per raggiungere l’obiettivo
+            <span class="info" aria-label="Info Time-to-goal">
+              <span class="tip">
+                Istogramma del <b>primo anno</b> in cui il capitale raggiunge l’obiettivo.
+                Le simulazioni che non lo raggiungono mai vengono conteggiate come <b>“mai”</b>.
+              </span>
+            </span>
+          </h2>
+          <small id="ttgMeta">—</small>
+        </div>
+        <div class="bd">
+          <div class="chartBox small">
+            <canvas id="ttgChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <!-- 3) Scomposizione risultato finale -->
+    <div class="card" id="cardDecomp">
+      <div class="cardInner">
+        <div class="hd">
+          <h2>
+            Scomposizione risultato finale
+            <span class="info" aria-label="Info Scomposizione">
+              <span class="tip">
+                Scomposizione della <b>mediana finale (p50)</b> in:
+                capitale versato, crescita stimata e tasse stimate.
+              </span>
+            </span>
+          </h2>
+          <small>p50 • breakdown</small>
+        </div>
+        <div class="bd">
+          <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+            <div class="kpi">
+              <div class="lab">Totale versato</div>
+              <div class="val" id="decContrib">—</div>
+              <div class="sub">Capitale iniziale + versamenti</div>
+            </div>
+            <div class="kpi">
+              <div class="lab">Tasse stimate</div>
+              <div class="val" id="decTax">—</div>
+              <div class="sub">Stima su p50 (sempl.)</div>
+            </div>
+            <div class="kpi">
+              <div class="lab">Crescita netta stimata</div>
+              <div class="val" id="decGrowth">—</div>
+              <div class="sub">p50 netto − versato</div>
+            </div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <!-- barre semplici -->
+          <div style="display:grid;gap:10px">
+            <div>
+              <div class="lab" style="color:#94a3b8;font-size:11px;letter-spacing:.25px;text-transform:uppercase">Composizione p50 netto</div>
+              <div class="prog" style="height:14px">
+                <div id="barContrib" style="width:0%"></div>
+              </div>
+              <div class="hint" id="barLabel">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <!-- 4) Required monthly per probabilità target -->
+    <div class="card" id="cardReqMonthly">
+      <div class="cardInner">
+        <div class="hd">
+          <h2>
+            Versamento necessario per probabilità target
+            <span class="info" aria-label="Info Required monthly">
+              <span class="tip">
+                Calcola il versamento mensile stimato necessario per raggiungere una certa probabilità di obiettivo
+                (a fine periodo), mantenendo invariati gli altri parametri.
+              </span>
+            </span>
+          </h2>
+          <small>Binary search • Monte Carlo</small>
+        </div>
+        <div class="bd">
+          <div class="row">
+            <div>
+              <label>Probabilità target</label>
+              <input id="targetProb" type="number" min="0.05" max="0.99" step="0.01" value="0.70">
+            </div>
+            <div>
+              <label>Max versamento (€)</label>
+              <input id="maxMonthly" type="number" min="0" step="50" value="5000">
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="ghost" id="btnCalcMonthly">Calcola versamento</button>
+            <span class="pill" id="calcStatus">—</span>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="kpi" style="background:rgba(2,6,23,.25)">
+            <div class="lab">Versamento mensile stimato</div>
+            <div class="val" id="reqMonthlyOut">—</div>
+            <div class="sub" id="reqMonthlySub">—</div>
+          </div>
+
+          <div class="hint">
+            <b>Nota:</b> calcolo indicativo basato su simulazioni Monte Carlo. Per velocità usa un numero di simulazioni ridotto rispetto a quello selezionato.
+          </div>
+        </div>
+      </div>
+    </div>
+<div style="height:16px"></div>
+
+<div style="height:16px"></div>
+
+<div class="card ctaCard" id="cardCTA">
+  <div class="cardInner">
+    <div class="ctaInner">
+      <h3>Vuoi una simulazione davvero su misura?</h3>
+
+      <p>
+        Questo simulatore è educativo e usa ipotesi semplificate (rendimenti sintetici, costi e tasse modellati in modo indicativo).
+        Se vuoi, posso aiutarti a impostare un piano coerente con obiettivi, orizzonte temporale e capacità di risparmio.
+      </p>
+
+      <div class="ctaActions">
+        <button class="primary" id="btnOpenCtaForm" type="button">Richiedi analisi gratuita</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+    <!-- DISCLAIMER -->
+    <div style="height:16px"></div>
+    <div class="card">
+      <div class="cardInner">
+        <div class="hd">
+          <h2>Disclaimer</h2>
+          <small>Importante</small>
+        </div>
+        <div class="bd">
+          <div class="footer" style="margin-top:0">
+            <b>Output informativo/educativo.</b> Non è consulenza personalizzata, né garanzia di risultati.
+            I parametri (μ/σ, costi, tasse) sono semplificazioni. I mercati possono avere comportamenti differenti da quelli simulati.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  console.log('SCRIPT PAC: START ✅');
+window.__pac_script_loaded = true;
+
+  const fmtEUR = new Intl.NumberFormat('it-IT', { style:'currency', currency:'EUR', maximumFractionDigits:0 });
+  const fmtPct = new Intl.NumberFormat('it-IT', { style:'percent', maximumFractionDigits:1 });
+
+  const defaultsByProfile = {
+    prudente:   { mu:0.035, sigma:0.07 },
+    bilanciato: { mu:0.055, sigma:0.12 },
+    dinamico:   { mu:0.070, sigma:0.18 },
+  };
+
+  const COLORS = {
+    p10: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#60a5fa',
+    p50: getComputedStyle(document.documentElement).getPropertyValue('--accent2').trim() || '#34d399',
+    p90: getComputedStyle(document.documentElement).getPropertyValue('--warn').trim() || '#fbbf24',
+    versato: getComputedStyle(document.documentElement).getPropertyValue('--gray').trim() || '#9ca3af',
+    obiettivo: getComputedStyle(document.documentElement).getPropertyValue('--purple').trim() || '#a78bfa',
+  };
+
+  const els = {
+    goal: document.getElementById('goal'),
+    years: document.getElementById('years'),
+    initial: document.getElementById('initial'),
+    monthly: document.getElementById('monthly'),
+    profile: document.getElementById('profile'),
+    sims: document.getElementById('sims'),
+    infl: document.getElementById('infl'),
+    adjInfl: document.getElementById('adjInfl'),
+    ter: document.getElementById('ter'),
+    bollo: document.getElementById('bollo'),
+    tax: document.getElementById('tax'),
+    seed: document.getElementById('seed'),
+    btnRun: document.getElementById('btnRun'),
+    btnShare: document.getElementById('btnShare'),
+    btnCSV: document.getElementById('btnCSV'),
+    statusPill: document.getElementById('statusPill'),
+    progBar: document.getElementById('progBar'),
+    progText: document.getElementById('progText'),
+    kpiMeta: document.getElementById('kpiMeta'),
+    kpiProb: document.getElementById('kpiProb'),
+    kpiProbSub: document.getElementById('kpiProbSub'),
+    kpiP10: document.getElementById('kpiP10'),
+    kpiP50: document.getElementById('kpiP50'),
+    kpiP90: document.getElementById('kpiP90'),
+    fanLegend: document.getElementById('fanLegend'),
+    cardParams: document.getElementById('cardParams'),
+    cardResults: document.getElementById('cardResults'),
+        // nuove card
+    probChart: document.getElementById('probChart'),
+    ttgChart: document.getElementById('ttgChart'),
+    ttgMeta: document.getElementById('ttgMeta'),
+
+    decContrib: document.getElementById('decContrib'),
+    decTax: document.getElementById('decTax'),
+    decGrowth: document.getElementById('decGrowth'),
+    barContrib: document.getElementById('barContrib'),
+    barLabel: document.getElementById('barLabel'),
+
+    targetProb: document.getElementById('targetProb'),
+    maxMonthly: document.getElementById('maxMonthly'),
+    btnCalcMonthly: document.getElementById('btnCalcMonthly'),
+    calcStatus: document.getElementById('calcStatus'),
+    reqMonthlyOut: document.getElementById('reqMonthlyOut'),
+    reqMonthlySub: document.getElementById('reqMonthlySub'),
+
+  };
+
+  function setStatus(text, kind="idle"){
+    els.statusPill.textContent = text;
+    const base = "1px solid rgba(255,255,255,.08)";
+    els.statusPill.style.border = base;
+    if(kind==="run"){
+      els.statusPill.style.border = "1px solid rgba(96,165,250,.45)";
+    } else if(kind==="ok"){
+      els.statusPill.style.border = "1px solid rgba(52,211,153,.45)";
+    } else if(kind==="err"){
+      els.statusPill.style.border = "1px solid rgba(251,113,133,.55)";
+    }
+  }
+
+  function readParams(){
+    const p = {
+      goal: +els.goal.value,
+      years: Math.max(1, Math.min(40, Math.floor(+els.years.value))),
+      initial: +els.initial.value,
+      monthly: +els.monthly.value,
+      profile: els.profile.value,
+      sims: Math.max(500, Math.floor(+els.sims.value)),
+      infl: +els.infl.value,
+      adjInfl: !!els.adjInfl.checked,
+      ter: +els.ter.value,
+      bollo: +els.bollo.value,
+      tax: +els.tax.value,
+      seed: Math.floor(+els.seed.value || 0),
+    };
+    p.mu = defaultsByProfile[p.profile].mu;
+    p.sigma = defaultsByProfile[p.profile].sigma;
+    return p;
+  }
+
+  function applyParamsFromURL(){
+    const q = new URLSearchParams(location.search);
+    const mapNum = (k, el) => { if(q.has(k)) el.value = String(+q.get(k)); };
+    const mapStr = (k, el) => { if(q.has(k)) el.value = q.get(k); };
+
+    mapNum("goal", els.goal);
+    mapNum("years", els.years);
+    mapNum("initial", els.initial);
+    mapNum("monthly", els.monthly);
+    mapStr("profile", els.profile);
+    mapNum("sims", els.sims);
+    mapNum("infl", els.infl);
+    if(q.has("adjInfl")) els.adjInfl.checked = (q.get("adjInfl") === "true");
+    mapNum("ter", els.ter);
+    mapNum("bollo", els.bollo);
+    mapNum("tax", els.tax);
+    mapNum("seed", els.seed);
+  }
+
+  function makeShareURL(){
+    const p = readParams();
+    const q = new URLSearchParams({
+      goal: p.goal, years: p.years, initial: p.initial, monthly: p.monthly,
+      profile: p.profile, sims: p.sims,
+      infl: p.infl, adjInfl: String(p.adjInfl),
+      ter: p.ter, bollo: p.bollo, tax: p.tax, seed: p.seed
+    });
+    return `${location.origin}${location.pathname}?${q.toString()}`;
+  }
+
+  // === series "versato" cumulato ===
+  function monthlyContribution(p, step){
+    if(p.monthly <= 0) return 0;
+    if(!p.adjInfl) return p.monthly;
+    const yearIndex = Math.floor((step-1)/12);
+    return p.monthly * Math.pow(1 + p.infl, yearIndex);
+  }
+  function buildContributedSeries(p){
+    const steps = p.years * 12;
+    let w = p.initial;
+    const out = [];
+    for(let t=1; t<=steps; t++){
+      w += monthlyContribution(p, t);
+      if(t % 12 === 0) out.push(w);
+    }
+    return out;
+  }
+
+  // Charts
+let fanChart, histChart, probChart, ttgChart;
+  // ===== Tooltip Portal (no clipping, always on top) =====
+function initTooltipPortal(){
+  const tip = document.createElement('div');
+  tip.className = 'globalTip';
+  document.body.appendChild(tip);
+
+  let active = null;
+
+  function place(el){
+    const r = el.getBoundingClientRect();
+    const padding = 10;
+
+    // posizione sotto l'icona
+    let x = r.left + r.width/2 - tip.offsetWidth/2;
+    let y = r.bottom + 10;
+
+    // clamp orizzontale
+    const maxX = window.innerWidth - tip.offsetWidth - padding;
+    x = Math.max(padding, Math.min(maxX, x));
+
+    // se sotto non c'è spazio, posiziona sopra
+    const maxY = window.innerHeight - tip.offsetHeight - padding;
+    if(y > maxY) y = r.top - tip.offsetHeight - 10;
+
+    tip.style.left = `${x}px`;
+    tip.style.top  = `${y}px`;
+  }
+
+  function show(el){
+    const content = el.querySelector('.tip');
+    if(!content) return;
+    tip.innerHTML = content.innerHTML;
+    tip.classList.add('show');
+    active = el;
+    requestAnimationFrame(()=> place(el));
+  }
+
+  function hide(){
+    tip.classList.remove('show');
+    active = null;
+  }
+
+  document.addEventListener('mouseover', (e)=>{
+    const el = e.target.closest('.info');
+    if(!el) return;
+    if(active === el) return;
+    show(el);
+  });
+
+  document.addEventListener('mouseout', (e)=>{
+    const el = e.target.closest('.info');
+    if(!el) return;
+    if(active === el) hide();
+  });
+
+  window.addEventListener('scroll', ()=> { if(active) place(active); }, { passive:true });
+  window.addEventListener('resize', ()=> { if(active) place(active); });
+}
+
+
+  function renderLegend(){
+    const items = [
+      { label:'p10 (prudente)', color:COLORS.p10, tip:'Scenario prudente: il 10% degli esiti è peggiore di questa curva.' },
+      { label:'p50 (mediana)', color:COLORS.p50, tip:'Scenario mediano: metà degli esiti è sopra e metà sotto.' },
+      { label:'p90 (favorevole)', color:COLORS.p90, tip:'Scenario favorevole: solo il 10% degli esiti è migliore di questa curva.' },
+      { label:'versato', color:COLORS.versato, tip:'Capitale complessivamente immesso (capitale iniziale + versamenti, indicizzati se attivo).' },
+      { label:'obiettivo', color:COLORS.obiettivo, tip:'Linea orizzontale del capitale target da raggiungere.' },
+    ];
+    els.fanLegend.innerHTML = '';
+    for(const it of items){
+      const pill = document.createElement('div');
+      pill.className = 'legendPill';
+      pill.innerHTML = `
+        <span class="legendDot" style="--c:${it.color}; background:${it.color}"></span>
+        <span class="lab">${it.label}</span>
+        <span class="info" style="transform:translateY(-.5px)">
+          <span class="tip">${it.tip}</span>
+        </span>
+      `;
+      els.fanLegend.appendChild(pill);
+    }
+  }
+
+  function initCharts(){
+    const fanCtx = document.getElementById("fanChart");
+    fanChart = new Chart(fanCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [
+        {
+          label:'p10', data: [], borderColor: COLORS.p10, borderWidth:2, tension:.25,
+          pointRadius:2.5, pointHoverRadius:5, pointHitRadius:10
+        },
+        {
+          label:'p50', data: [], borderColor: COLORS.p50, borderWidth:3, tension:.25,
+          pointRadius:2.5, pointHoverRadius:5, pointHitRadius:10
+        },
+        {
+          label:'p90', data: [], borderColor: COLORS.p90, borderWidth:2, tension:.25,
+          pointRadius:2.5, pointHoverRadius:5, pointHitRadius:10
+        },
+        {
+          label:'Versato', data: [], borderColor: COLORS.versato, borderWidth:2, borderDash:[6,6], tension:0,
+          pointRadius:2.5, pointHoverRadius:5, pointHitRadius:10
+        },
+        {
+          label:'Obiettivo', data: [], borderColor: COLORS.obiettivo, borderWidth:2, borderDash:[10,6], tension:0,
+          pointRadius:0, pointHoverRadius:0
+        }
+      ]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{
+          legend:{ display:false }
+        },
+        scales:{
+          x:{
+            ticks:{ color:'#94a3b8' },
+            grid:{ color:'rgba(255,255,255,.06)' },
+            title:{ display:true, text:'Anni', color:'#94a3b8', font:{ weight:'700' } }
+          },
+          y:{
+            ticks:{ color:'#94a3b8', callback:(v)=>fmtEUR.format(v) },
+            grid:{ color:'rgba(255,255,255,.06)' },
+            title:{ display:true, text:'€', color:'#94a3b8', font:{ weight:'700' } }
+          }
+        }
+      }
+    });
+
+    const histCtx = document.getElementById("histChart");
+    histChart = new Chart(histCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label:'Distribuzione finale (netto)', data: [], borderWidth:0 }]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ color:'#cbd5e1' } } },
+        scales:{
+          x:{ ticks:{ color:'#94a3b8' }, grid:{ color:'rgba(255,255,255,.06)' } },
+          y:{ ticks:{ color:'#94a3b8' }, grid:{ color:'rgba(255,255,255,.06)' } }
+        }
+      }
+    });
+        // === 1) Probabilità obiettivo nel tempo (line) ===
+    probChart = new Chart(els.probChart, {
+      type:'line',
+      data:{ labels:[], datasets:[{
+        label:'Probabilità obiettivo',
+        data:[],
+        borderWidth:2,
+        tension:.25,
+        pointRadius:2.5,
+        pointHoverRadius:5,
+        pointHitRadius:10
+      }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ ticks:{ color:'#94a3b8' }, grid:{ color:'rgba(255,255,255,.06)' }, title:{ display:true, text:'Anni', color:'#94a3b8', font:{ weight:'700' } } },
+          y:{
+            ticks:{ color:'#94a3b8', callback:(v)=>`${Math.round(v*100)}%` },
+            grid:{ color:'rgba(255,255,255,.06)' },
+            min:0, max:1,
+            title:{ display:true, text:'Probabilità', color:'#94a3b8', font:{ weight:'700' } }
+          }
+        }
+      }
+    });
+
+    // === 2) Time-to-goal (bar) ===
+    ttgChart = new Chart(els.ttgChart, {
+      type:'bar',
+      data:{ labels:[], datasets:[{ label:'Frequenza', data:[], borderWidth:0 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ ticks:{ color:'#94a3b8' }, grid:{ color:'rgba(255,255,255,.06)' }, title:{ display:true, text:'Anno di raggiungimento', color:'#94a3b8', font:{ weight:'700' } } },
+          y:{ ticks:{ color:'#94a3b8' }, grid:{ color:'rgba(255,255,255,.06)' }, title:{ display:true, text:'N. simulazioni', color:'#94a3b8', font:{ weight:'700' } } }
+        }
+      }
+    });
+
+
+    renderLegend();
+  }
+
+  function updateCharts(res, p){
+    fanChart.data.labels = res.timelineYears.map(y=>String(y));
+    fanChart.data.datasets[0].data = res.timelineP10;
+    fanChart.data.datasets[1].data = res.timelineP50;
+    fanChart.data.datasets[2].data = res.timelineP90;
+    fanChart.data.datasets[3].data = buildContributedSeries(p);
+    fanChart.data.datasets[4].data = res.timelineYears.map(()=>p.goal);
+    fanChart.update();
+
+    histChart.data.labels = res.histBins.map(v=>fmtEUR.format(v));
+    histChart.data.datasets[0].data = res.histCounts;
+    histChart.update();
+    // === aggiorna card 1) Probabilità obiettivo nel tempo ===
+    if(res.probGoalByYear){
+      probChart.data.labels = res.timelineYears.map(String);
+      probChart.data.datasets[0].data = res.probGoalByYear;
+      probChart.update();
+    }
+
+    // === aggiorna card 2) Time-to-goal ===
+    if(res.ttgLabels && res.ttgCounts){
+      ttgChart.data.labels = res.ttgLabels;
+      ttgChart.data.datasets[0].data = res.ttgCounts;
+      ttgChart.update();
+
+      if(res.ttgMeta){
+        els.ttgMeta.textContent = res.ttgMeta;
+      }
+    }
+
+    // === aggiorna card 3) Scomposizione ===
+    if(typeof res.contributedTotal === 'number'){
+      els.decContrib.textContent = fmtEUR.format(res.contributedTotal);
+    }
+    if(typeof res.taxOnP50 === 'number'){
+      els.decTax.textContent = fmtEUR.format(res.taxOnP50);
+    }
+    if(typeof res.p50 === 'number' && typeof res.contributedTotal === 'number'){
+      const growth = res.p50 - res.contributedTotal;
+      els.decGrowth.textContent = fmtEUR.format(growth);
+
+      // barre: mostriamo quota versato sul p50 netto
+      const pct = res.p50 > 0 ? Math.max(0, Math.min(100, (res.contributedTotal / res.p50) * 100)) : 0;
+      els.barContrib.style.width = `${pct}%`;
+      els.barLabel.textContent = `Versato ≈ ${pct.toFixed(0)}% del p50 netto (resto: crescita netta e tasse stimate)`;
+    }
+
+    syncCardHeights();
+  }
+
+  function setKPIs(res, p){
+    els.kpiProb.textContent = fmtPct.format(res.probGoal);
+    const tag = res.probGoal >= 0.70 ? "Alta" : (res.probGoal >= 0.45 ? "Media" : "Bassa");
+    els.kpiProbSub.textContent = `Affidabilità: ${tag}`;
+    els.kpiP10.textContent = fmtEUR.format(res.p10);
+    els.kpiP50.textContent = fmtEUR.format(res.p50);
+    els.kpiP90.textContent = fmtEUR.format(res.p90);
+    els.kpiMeta.textContent = `${p.sims.toLocaleString('it-IT')} simulazioni • ${p.years} anni • profilo ${p.profile}`;
+  }
+
+  function setProgress(pct, text){
+    els.progBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+    els.progText.textContent = text || "—";
+  }
+
+  // ✅ allinea in basso Parametri vs Risultati
+  function syncCardHeights(){
+    if(window.matchMedia("(max-width: 980px)").matches) {
+      els.cardResults.style.minHeight = "";
+      return;
+    }
+    const hParams = els.cardParams.getBoundingClientRect().height;
+    const hResults = els.cardResults.getBoundingClientRect().height;
+    if(hResults < hParams){
+      els.cardResults.style.minHeight = `${Math.ceil(hParams)}px`;
+    } else {
+      els.cardResults.style.minHeight = "";
+    }
+  }
+  window.addEventListener("resize", () => syncCardHeights());
+
+  // Worker
+const worker = new Worker("mc.worker.js?v=2", { type:"module" });
+  let lastCSV = null;
+
+  worker.onmessage = (e) => {
+    const msg = e.data;
+    if(msg.type === "progress"){
+      setStatus("In esecuzione", "run");
+      setProgress(msg.pct, msg.text);
+      return;
+    }
+    if(msg.type === "result"){
+      setStatus("Completato", "ok");
+      setProgress(100, "Fatto ✅");
+      const p = readParams();
+      setKPIs(msg.result, p);
+      updateCharts(msg.result, p);
+      lastCSV = msg.result.csv;
+      return;
+    }
+    if(msg.type === "error"){
+      setStatus("Errore", "err");
+      setProgress(0, msg.message || "Errore");
+      console.error(msg);
+    }
+  };
+
+  function run(){
+    const p = readParams();
+    els.years.value = String(p.years);
+
+    setStatus("Avvio...", "run");
+    setProgress(0, "Preparazione…");
+
+    worker.postMessage({ type:"run", params: p });
+    // piccola sync subito (poi aggiornata su result)
+    setTimeout(syncCardHeights, 50);
+  }
+
+  els.btnRun.addEventListener("click", run);
+
+  els.btnShare.addEventListener("click", async () => {
+    const url = makeShareURL();
+    try{
+      await navigator.clipboard.writeText(url);
+      setStatus("Link copiato ✅", "ok");
+      setTimeout(()=>setStatus("Pronto","idle"), 1200);
+    }catch{
+      prompt("Copia il link:", url);
+    }
+  });
+
+  els.btnCSV.addEventListener("click", () => {
+    if(!lastCSV){
+      alert("Prima avvia una simulazione.");
+      return;
+    }
+    const blob = new Blob([lastCSV], { type:"text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pac_montecarlo_results.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+  // ===== Required monthly per probabilità target =====
+async function runOnceWithMonthly(baseParams, monthlyValue, simsOverride){
+  return new Promise((resolve, reject) => {
+const w = new Worker("mc.worker.js?v=2", { type:"module" });
+    const params = { ...baseParams, monthly: monthlyValue, sims: simsOverride ?? baseParams.sims };
+
+    w.onmessage = (e) => {
+      const msg = e.data;
+      if(msg.type === "result"){
+        w.terminate();
+        resolve(msg.result);
+      } else if(msg.type === "error"){
+        w.terminate();
+        reject(new Error(msg.message || "Errore worker"));
+      }
+    };
+
+    w.postMessage({ type:"run", params });
+  });
+}
+
+async function calcRequiredMonthly(){
+  const base = readParams();
+  const target = Math.max(0.05, Math.min(0.99, +els.targetProb.value));
+  const maxM = Math.max(0, +els.maxMonthly.value);
+
+  // per velocità: usa meno simulazioni (ma non troppo poche)
+  const simsFast = Math.max(1500, Math.min(6000, Math.floor(base.sims * 0.5)));
+
+  els.calcStatus.textContent = "Calcolo…";
+  els.reqMonthlyOut.textContent = "—";
+  els.reqMonthlySub.textContent = `Simulazioni usate: ${simsFast.toLocaleString('it-IT')}`;
+
+  // se già con 0 raggiunge il target
+  let r0 = await runOnceWithMonthly(base, 0, simsFast);
+  if(r0.probGoal >= target){
+    els.calcStatus.textContent = "Trovato ✅";
+    els.reqMonthlyOut.textContent = fmtEUR.format(0);
+    els.reqMonthlySub.textContent = `Con 0€/mese la probabilità è ${fmtPct.format(r0.probGoal)} ≥ target ${fmtPct.format(target)}.`;
+    return;
+  }
+
+  // verifica che maxM basti
+  let rMax = await runOnceWithMonthly(base, maxM, simsFast);
+  if(rMax.probGoal < target){
+    els.calcStatus.textContent = "Non raggiungibile";
+    els.reqMonthlyOut.textContent = "—";
+    els.reqMonthlySub.textContent = `Anche con ${fmtEUR.format(maxM)} la probabilità è ${fmtPct.format(rMax.probGoal)} < target ${fmtPct.format(target)}.`;
+    return;
+  }
+
+  // binary search
+  let lo = 0, hi = maxM;
+  let best = hi, bestProb = rMax.probGoal;
+
+  for(let i=0; i<12; i++){
+    const mid = Math.round(((lo + hi) / 2) / 10) * 10; // arrotonda a 10€
+    const r = await runOnceWithMonthly(base, mid, simsFast);
+
+    els.calcStatus.textContent = `Iter ${i+1}/12…`;
+
+    if(r.probGoal >= target){
+      best = mid;
+      bestProb = r.probGoal;
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+
+    if(hi - lo <= 10) break;
+  }
+
+  els.calcStatus.textContent = "Trovato ✅";
+  els.reqMonthlyOut.textContent = fmtEUR.format(best);
+  els.reqMonthlySub.textContent = `Probabilità stimata: ${fmtPct.format(bestProb)} (target ${fmtPct.format(target)}).`;
+}
+
+els.btnCalcMonthly?.addEventListener("click", () => {
+  calcRequiredMonthly().catch(err => {
+    console.error(err);
+    els.calcStatus.textContent = "Errore";
+    els.reqMonthlySub.textContent = err.message || String(err);
+  });
+});
+
+// ===== CTA Modal open/close =====
+(function initCtaModal(){
+  const btnOpen = document.getElementById('btnOpenCtaForm');
+  const modal = document.getElementById('modalCta');
+  const btnClose = document.getElementById('btnCloseCta');
+  const btnCancel = document.getElementById('btnCancelCta');
+
+  if(!btnOpen || !modal) return;
+
+  function open(){
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    const first = modal.querySelector('input[name="nome_cognome"]');
+    if(first) first.focus();
+  }
+
+  function close(){
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  btnOpen.addEventListener('click', open);
+  btnClose?.addEventListener('click', close);
+  btnCancel?.addEventListener('click', close);
+
+  modal.addEventListener('click', (e)=>{
+    if(e.target === modal) close();
+  });
+
+  window.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && modal.classList.contains('open')) close();
+  });
+})();
+// ===== CTA Modal open/close =====
+(function initCtaModal(){
+  const btnOpen = document.getElementById('btnOpenCtaForm');
+  const modal = document.getElementById('modalCta');
+  const btnClose = document.getElementById('btnCloseCta');
+  const btnCancel = document.getElementById('btnCancelCta');
+
+  if(!btnOpen || !modal) return;
+
+  function open(){
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    const first = modal.querySelector('input[name="nome_cognome"]');
+    if(first) first.focus();
+  }
+  function close(){
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  btnOpen.addEventListener('click', (e) => { e.preventDefault(); open(); });
+  btnClose && btnClose.addEventListener('click', close);
+  btnCancel && btnCancel.addEventListener('click', close);
+
+  modal.addEventListener('click', (e)=>{ if(e.target === modal) close(); });
+  window.addEventListener('keydown', (e)=>{ if(e.key === 'Escape') close(); });
+})();
+
+  // init
+  applyParamsFromURL();
+  initCharts();
+  initTooltipPortal();
+  run();
+  setTimeout(syncCardHeights, 120);
+</script>
+<!-- ===== CTA MODAL (Formspree) ===== -->
+<div class="modalOverlay" id="modalCta" aria-hidden="true">
+  <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalCtaTitle">
+    <div class="modalHead">
+      <div>
+        <div class="modalTitle" id="modalCtaTitle">Richiedi analisi gratuita</div>
+        <div class="modalSub">Compila i dati: ti ricontatterò via email/telefono per approfondire.</div>
+      </div>
+      <button class="iconBtn" type="button" id="btnCloseCta" aria-label="Chiudi">✕</button>
+    </div>
+
+    <div class="modalBody">
+      <form method="POST" action="https://formspree.io/f/xojjangr" id="ctaModalForm">
+        <!-- honeypot anti-bot -->
+        <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+
+        <div class="modalGrid">
+          <div>
+            <label>Nome e Cognome</label>
+            <input name="nome_cognome" required placeholder="Es. Mario Rossi">
+          </div>
+
+          <div>
+            <label>Email</label>
+            <input type="email" name="email" required placeholder="nome@email.it">
+          </div>
+
+          <div>
+            <label>Numero di telefono</label>
+            <input name="telefono" required placeholder="+39 ...">
+          </div>
+
+          <div>
+            <label>Messaggio (opzionale)</label>
+            <input name="messaggio" placeholder="Obiettivo, durata, versamento... (facoltativo)">
+          </div>
+        </div>
+
+        <input type="hidden" name="tool" value="PAC Simulator PRO">
+        <input type="hidden" name="page" value="Monte Carlo">
+
+        <div class="modalActions">
+          <button class="ghost" type="button" id="btnCancelCta">Annulla</button>
+          <button class="primary" type="submit">Invia richiesta</button>
+        </div>
+
+        <div class="hint" style="margin-top:10px">
+          <b>Nota:</b> inviando il form autorizzi a ricontattarti per rispondere alla richiesta.
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
